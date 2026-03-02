@@ -1,0 +1,200 @@
+SET SERVEROUTPUT ON;
+
+-- PHIẾU BÀI TẬP 1: KHOA & LOP
+
+-- Tạo bảng KHOA
+CREATE TABLE KHOA (
+    Makhoa    VARCHAR2(10) PRIMARY KEY,
+    Tenkhoa   VARCHAR2(100),
+    Dienthoai VARCHAR2(20)
+);
+
+-- Tạo bảng LOP
+CREATE TABLE LOP (
+    Malop       VARCHAR2(10) PRIMARY KEY,
+    Tenlop      VARCHAR2(100),
+    Khoa        NUMBER,
+    Hedt        VARCHAR2(50),
+    Namnhaphoc  NUMBER,
+    Makhoa      VARCHAR2(10),
+    CONSTRAINT fk_lop_khoa FOREIGN KEY (Makhoa) REFERENCES KHOA(Makhoa)
+);
+
+-- Dữ liệu mẫu cho KHOA
+INSERT INTO KHOA VALUES ('CNTT', 'Cong Nghe Thong Tin', '0123456789');
+INSERT INTO KHOA VALUES ('QTKD', 'Quan Tri Kinh Doanh', '0987654321');
+INSERT INTO KHOA VALUES ('KT',   'Ke Toan',             '0112233445');
+COMMIT;
+
+-- Dữ liệu mẫu cho LOP
+INSERT INTO LOP VALUES ('L001', 'CNTT-K1', 1, 'Dai hoc chinh quy', 2022, 'CNTT');
+INSERT INTO LOP VALUES ('L002', 'CNTT-K2', 1, 'Dai hoc chinh quy', 2023, 'CNTT');
+INSERT INTO LOP VALUES ('L003', 'QTKD-K1', 2, 'Cao dang',           2022, 'QTKD');
+COMMIT;
+
+-- BÀI TẬP 1: Thủ tục nhập KHOA (kiểm tra Tenkhoa)
+
+CREATE OR REPLACE PROCEDURE sp_them_khoa (
+    p_makhoa    IN KHOA.Makhoa%TYPE,
+    p_tenkhoa   IN KHOA.Tenkhoa%TYPE,
+    p_dienthoai IN KHOA.Dienthoai%TYPE
+) AS
+    v_dem NUMBER := 0;
+BEGIN
+    SELECT COUNT(*) INTO v_dem FROM KHOA WHERE Tenkhoa = p_tenkhoa;
+    IF v_dem > 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Thong bao: Ten khoa "' || p_tenkhoa || '" da ton tai!');
+    ELSE
+        INSERT INTO KHOA (Makhoa, Tenkhoa, Dienthoai)
+        VALUES (p_makhoa, p_tenkhoa, p_dienthoai);
+        COMMIT;
+        DBMS_OUTPUT.PUT_LINE('Them khoa thanh cong: ' || p_tenkhoa);
+    END IF;
+END sp_them_khoa;
+/
+
+-- Test BÀI TẬP 1
+-- TH1: Tên khoa chưa tồn tại → thành công
+BEGIN
+    sp_them_khoa('DTVT', 'Dien Tu Vien Thong', '0334455667');
+END;
+/
+
+-- TH2: Tên khoa đã tồn tại → thông báo
+BEGIN
+    sp_them_khoa('KT99', 'Ke Toan', '0999999999');
+END;
+/
+
+-- BÀI TẬP 2: Thủ tục nhập LOP (kiểm tra tenlop + makhoa)
+
+CREATE OR REPLACE PROCEDURE sp_them_lop (
+    p_malop      IN LOP.Malop%TYPE,
+    p_tenlop     IN LOP.Tenlop%TYPE,
+    p_khoa       IN LOP.Khoa%TYPE,
+    p_hedt       IN LOP.Hedt%TYPE,
+    p_namnhaphoc IN LOP.Namnhaphoc%TYPE,
+    p_makhoa     IN LOP.Makhoa%TYPE
+) AS
+    v_dem_lop   NUMBER := 0;
+    v_dem_khoa  NUMBER := 0;
+BEGIN
+    -- Kiểm tra tên lớp
+    SELECT COUNT(*) INTO v_dem_lop FROM LOP WHERE Tenlop = p_tenlop;
+    IF v_dem_lop > 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Thong bao: Ten lop "' || p_tenlop || '" da ton tai!');
+        RETURN;
+    END IF;
+
+    -- Kiểm tra makhoa
+    SELECT COUNT(*) INTO v_dem_khoa FROM KHOA WHERE Makhoa = p_makhoa;
+    IF v_dem_khoa = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Thong bao: Ma khoa "' || p_makhoa || '" khong ton tai!');
+        RETURN;
+    END IF;
+
+    -- Thêm lớp
+    INSERT INTO LOP (Malop, Tenlop, Khoa, Hedt, Namnhaphoc, Makhoa)
+    VALUES (p_malop, p_tenlop, p_khoa, p_hedt, p_namnhaphoc, p_makhoa);
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Them lop thanh cong: ' || p_tenlop);
+END sp_them_lop;
+/
+
+-- Test BÀI TẬP 2
+BEGIN sp_them_lop('L010', 'KT-K1', 3, 'Dai hoc chinh quy', 2023, 'KT'); END;
+/
+BEGIN sp_them_lop('L011', 'CNTT-K1', 1, 'Dai hoc chinh quy', 2023, 'CNTT'); END;  -- tên đã có
+/
+BEGIN sp_them_lop('L012', 'XD-K1', 4, 'Dai hoc', 2023, 'XD'); END;  -- makhoa không có
+/
+
+-- BÀI TẬP 3: Thủ tục nhập KHOA có OUT trả về 0/1
+
+CREATE OR REPLACE PROCEDURE sp_them_khoa_out (
+    p_makhoa    IN  KHOA.Makhoa%TYPE,
+    p_tenkhoa   IN  KHOA.Tenkhoa%TYPE,
+    p_dienthoai IN  KHOA.Dienthoai%TYPE,
+    p_ketqua    OUT NUMBER
+) AS
+    v_dem NUMBER := 0;
+BEGIN
+    SELECT COUNT(*) INTO v_dem FROM KHOA WHERE Tenkhoa = p_tenkhoa;
+    IF v_dem > 0 THEN
+        p_ketqua := 0;  -- Đã tồn tại
+    ELSE
+        INSERT INTO KHOA (Makhoa, Tenkhoa, Dienthoai)
+        VALUES (p_makhoa, p_tenkhoa, p_dienthoai);
+        COMMIT;
+        p_ketqua := 1;  -- Thêm thành công
+    END IF;
+END sp_them_khoa_out;
+/
+
+-- Test BÀI TẬP 3
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_them_khoa_out('MT', 'My Thuat', '0700000001', v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- Mong doi: 1
+END;
+/
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_them_khoa_out('MT2', 'Ke Toan', '0700000002', v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- Mong doi: 0 (ten da ton tai)
+END;
+/
+
+-- BÀI TẬP 4: Thủ tục nhập LOP có OUT (0, 1, 2)
+
+CREATE OR REPLACE PROCEDURE sp_them_lop_out (
+    p_malop      IN  LOP.Malop%TYPE,
+    p_tenlop     IN  LOP.Tenlop%TYPE,
+    p_khoa       IN  LOP.Khoa%TYPE,
+    p_hedt       IN  LOP.Hedt%TYPE,
+    p_namnhaphoc IN  LOP.Namnhaphoc%TYPE,
+    p_makhoa     IN  LOP.Makhoa%TYPE,
+    p_ketqua     OUT NUMBER
+) AS
+    v_dem_lop  NUMBER := 0;
+    v_dem_khoa NUMBER := 0;
+BEGIN
+    SELECT COUNT(*) INTO v_dem_lop FROM LOP WHERE Tenlop = p_tenlop;
+    IF v_dem_lop > 0 THEN
+        p_ketqua := 0;  -- Tên lớp đã tồn tại
+        RETURN;
+    END IF;
+
+    SELECT COUNT(*) INTO v_dem_khoa FROM KHOA WHERE Makhoa = p_makhoa;
+    IF v_dem_khoa = 0 THEN
+        p_ketqua := 1;  -- Makhoa không tồn tại
+        RETURN;
+    END IF;
+
+    INSERT INTO LOP (Malop, Tenlop, Khoa, Hedt, Namnhaphoc, Makhoa)
+    VALUES (p_malop, p_tenlop, p_khoa, p_hedt, p_namnhaphoc, p_makhoa);
+    COMMIT;
+    p_ketqua := 2;  -- Thêm thành công
+END sp_them_lop_out;
+/
+
+-- Test BÀI TẬP 4
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_them_lop_out('L020', 'MT-K1', 5, 'Cao dang', 2024, 'MT', v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- 2 (thanh cong)
+END;
+/
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_them_lop_out('L021', 'CNTT-K1', 1, 'CQ', 2024, 'CNTT', v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- 0 (ten lop da co)
+END;
+/
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_them_lop_out('L022', 'ABC-K1', 9, 'CQ', 2024, 'ZZZZ', v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- 1 (makhoa khong co)
+END;
+/
+

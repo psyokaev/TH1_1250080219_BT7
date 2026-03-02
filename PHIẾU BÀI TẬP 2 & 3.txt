@@ -1,0 +1,265 @@
+-- PHIẾU BÀI TẬP 2 & 3: CSDL QLNV
+
+
+-- Tạo bảng tblChucVu
+CREATE TABLE tblChucVu (
+    MaCV  VARCHAR2(10) PRIMARY KEY,
+    TenCV VARCHAR2(100)
+);
+
+-- Tạo bảng tblNhanVien
+CREATE TABLE tblNhanVien (
+    MaNV        VARCHAR2(10) PRIMARY KEY,
+    MaCV        VARCHAR2(10),
+    TenNV       VARCHAR2(100),
+    NgaySinh    DATE,
+    LuongCanBan NUMBER(10,2),
+    NgayCong    NUMBER,
+    PhuCap      NUMBER(10,2),
+    CONSTRAINT fk_nv_cv FOREIGN KEY (MaCV) REFERENCES tblChucVu(MaCV)
+);
+
+-- Dữ liệu mẫu tblChucVu (ít nhất 4)
+INSERT INTO tblChucVu VALUES ('CV01', 'Giam doc');
+INSERT INTO tblChucVu VALUES ('CV02', 'Truong phong');
+INSERT INTO tblChucVu VALUES ('CV03', 'Nhan vien');
+INSERT INTO tblChucVu VALUES ('CV04', 'Ke toan truong');
+COMMIT;
+
+-- Dữ liệu mẫu tblNhanVien (ít nhất 3)
+INSERT INTO tblNhanVien VALUES ('NV01', 'CV01', 'Nguyen Van An',   TO_DATE('15/03/1985','DD/MM/YYYY'), 15000000, 26, 2000000);
+INSERT INTO tblNhanVien VALUES ('NV02', 'CV02', 'Tran Thi Binh',   TO_DATE('20/07/1990','DD/MM/YYYY'), 10000000, 24, 1000000);
+INSERT INTO tblNhanVien VALUES ('NV03', 'CV03', 'Le Van Cuong',    TO_DATE('05/01/1995','DD/MM/YYYY'),  8000000, 25,  500000);
+COMMIT;
+
+-- PHIẾU 2 – a. SP_Them_Nhan_Vien
+
+CREATE OR REPLACE PROCEDURE SP_Them_Nhan_Vien (
+    p_manv        IN tblNhanVien.MaNV%TYPE,
+    p_macv        IN tblNhanVien.MaCV%TYPE,
+    p_tennv       IN tblNhanVien.TenNV%TYPE,
+    p_ngaysinh    IN tblNhanVien.NgaySinh%TYPE,
+    p_luongcanban IN tblNhanVien.LuongCanBan%TYPE,
+    p_ngaycong    IN tblNhanVien.NgayCong%TYPE,
+    p_phucap      IN tblNhanVien.PhuCap%TYPE
+) AS
+    v_dem NUMBER := 0;
+BEGIN
+    SELECT COUNT(*) INTO v_dem FROM tblChucVu WHERE MaCV = p_macv;
+    IF v_dem = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Thong bao: Ma chuc vu "' || p_macv || '" khong ton tai!');
+    ELSE
+        INSERT INTO tblNhanVien (MaNV, MaCV, TenNV, NgaySinh, LuongCanBan, NgayCong, PhuCap)
+        VALUES (p_manv, p_macv, p_tennv, p_ngaysinh, p_luongcanban, p_ngaycong, p_phucap);
+        COMMIT;
+        DBMS_OUTPUT.PUT_LINE('Them nhan vien thanh cong: ' || p_tennv);
+    END IF;
+END SP_Them_Nhan_Vien;
+/
+
+-- Test SP_Them_Nhan_Vien
+BEGIN
+    SP_Them_Nhan_Vien('NV04','CV03','Pham Thi Dao',TO_DATE('10/05/1998','DD/MM/YYYY'),7500000,22,300000);
+END;
+/
+BEGIN
+    SP_Them_Nhan_Vien('NV05','CV99','Nguyen Sai MaCV',TO_DATE('01/01/2000','DD/MM/YYYY'),5000000,20,200000);
+END;
+/
+
+-- PHIẾU 2 – b. SP_CapNhat_Nhan_Vien
+
+CREATE OR REPLACE PROCEDURE SP_CapNhat_Nhan_Vien (
+    p_manv        IN tblNhanVien.MaNV%TYPE,
+    p_macv        IN tblNhanVien.MaCV%TYPE,
+    p_tennv       IN tblNhanVien.TenNV%TYPE,
+    p_ngaysinh    IN tblNhanVien.NgaySinh%TYPE,
+    p_luongcanban IN tblNhanVien.LuongCanBan%TYPE,
+    p_ngaycong    IN tblNhanVien.NgayCong%TYPE,
+    p_phucap      IN tblNhanVien.PhuCap%TYPE
+) AS
+    v_dem_cv NUMBER := 0;
+    v_dem_nv NUMBER := 0;
+BEGIN
+    SELECT COUNT(*) INTO v_dem_nv FROM tblNhanVien WHERE MaNV = p_manv;
+    IF v_dem_nv = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Thong bao: Ma nhan vien "' || p_manv || '" khong ton tai!');
+        RETURN;
+    END IF;
+
+    SELECT COUNT(*) INTO v_dem_cv FROM tblChucVu WHERE MaCV = p_macv;
+    IF v_dem_cv = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Thong bao: Ma chuc vu "' || p_macv || '" khong ton tai!');
+        RETURN;
+    END IF;
+
+    UPDATE tblNhanVien
+    SET MaCV = p_macv, TenNV = p_tennv, NgaySinh = p_ngaysinh,
+        LuongCanBan = p_luongcanban, NgayCong = p_ngaycong, PhuCap = p_phucap
+    WHERE MaNV = p_manv;
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Cap nhat nhan vien thanh cong: ' || p_manv);
+END SP_CapNhat_Nhan_Vien;
+/
+
+-- Test SP_CapNhat_Nhan_Vien
+BEGIN
+    SP_CapNhat_Nhan_Vien('NV01','CV02','Nguyen Van An (updated)',TO_DATE('15/03/1985','DD/MM/YYYY'),16000000,26,2500000);
+END;
+/
+BEGIN
+    SP_CapNhat_Nhan_Vien('NV01','CVXX','Test sai MaCV',TO_DATE('15/03/1985','DD/MM/YYYY'),16000000,26,2500000);
+END;
+/
+
+-- PHIẾU 2 – c. SP_LuongLN (không tham số, tính lương)
+
+CREATE OR REPLACE PROCEDURE SP_LuongLN AS
+    CURSOR cur_nv IS
+        SELECT MaNV, TenNV, LuongCanBan, NgayCong, PhuCap FROM tblNhanVien;
+    v_luong NUMBER;
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('===== DANH SACH LUONG NHAN VIEN =====');
+    FOR r IN cur_nv LOOP
+        v_luong := r.LuongCanBan * r.NgayCong + r.PhuCap;
+        DBMS_OUTPUT.PUT_LINE('NV: ' || r.TenNV || ' | Luong: ' || TO_CHAR(v_luong,'999,999,999'));
+    END LOOP;
+END SP_LuongLN;
+/
+
+-- Test SP_LuongLN
+BEGIN
+    SP_LuongLN;
+END;
+/
+
+-- PHIẾU 3 – 1. sp_them_nhan_vien1 (có OUT kiểm tra MaCV)
+
+CREATE OR REPLACE PROCEDURE sp_them_nhan_vien1 (
+    p_manv        IN  tblNhanVien.MaNV%TYPE,
+    p_macv        IN  tblNhanVien.MaCV%TYPE,
+    p_tennv       IN  tblNhanVien.TenNV%TYPE,
+    p_ngaysinh    IN  tblNhanVien.NgaySinh%TYPE,
+    p_luongcb     IN  tblNhanVien.LuongCanBan%TYPE,
+    p_ngaycong    IN  tblNhanVien.NgayCong%TYPE,
+    p_phucap      IN  tblNhanVien.PhuCap%TYPE,
+    p_ketqua      OUT NUMBER
+) AS
+    v_dem_cv NUMBER := 0;
+BEGIN
+    SELECT COUNT(*) INTO v_dem_cv FROM tblChucVu WHERE MaCV = p_macv;
+    IF v_dem_cv = 0 THEN
+        p_ketqua := 0;  -- MaCV chưa tồn tại
+        RETURN;
+    END IF;
+
+    INSERT INTO tblNhanVien (MaNV, MaCV, TenNV, NgaySinh, LuongCanBan, NgayCong, PhuCap)
+    VALUES (p_manv, p_macv, p_tennv, p_ngaysinh, p_luongcb, p_ngaycong, p_phucap);
+    COMMIT;
+    p_ketqua := 2;  -- Thành công
+END sp_them_nhan_vien1;
+/
+
+-- Test Phiếu 3 – bài 1
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_them_nhan_vien1('NV10','CV04','Ho Thi Em',TO_DATE('25/12/1993','DD/MM/YYYY'),9000000,23,800000,v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- 2
+END;
+/
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_them_nhan_vien1('NV11','CV99','Test',TO_DATE('01/01/2000','DD/MM/YYYY'),5000000,20,200000,v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- 0
+END;
+/
+
+-- PHIẾU 3 – 2. Kiểm tra thêm MaNV trùng lặp (0, 1, 2)
+
+CREATE OR REPLACE PROCEDURE sp_them_nhan_vien2 (
+    p_manv        IN  tblNhanVien.MaNV%TYPE,
+    p_macv        IN  tblNhanVien.MaCV%TYPE,
+    p_tennv       IN  tblNhanVien.TenNV%TYPE,
+    p_ngaysinh    IN  tblNhanVien.NgaySinh%TYPE,
+    p_luongcb     IN  tblNhanVien.LuongCanBan%TYPE,
+    p_ngaycong    IN  tblNhanVien.NgayCong%TYPE,
+    p_phucap      IN  tblNhanVien.PhuCap%TYPE,
+    p_ketqua      OUT NUMBER
+) AS
+    v_dem_nv NUMBER := 0;
+    v_dem_cv NUMBER := 0;
+BEGIN
+    -- Kiểm tra MaNV trùng
+    SELECT COUNT(*) INTO v_dem_nv FROM tblNhanVien WHERE MaNV = p_manv;
+    IF v_dem_nv > 0 THEN
+        p_ketqua := 0;  -- MaNV đã tồn tại
+        RETURN;
+    END IF;
+
+    -- Kiểm tra MaCV
+    SELECT COUNT(*) INTO v_dem_cv FROM tblChucVu WHERE MaCV = p_macv;
+    IF v_dem_cv = 0 THEN
+        p_ketqua := 1;  -- MaCV không tồn tại
+        RETURN;
+    END IF;
+
+    INSERT INTO tblNhanVien (MaNV, MaCV, TenNV, NgaySinh, LuongCanBan, NgayCong, PhuCap)
+    VALUES (p_manv, p_macv, p_tennv, p_ngaysinh, p_luongcb, p_ngaycong, p_phucap);
+    COMMIT;
+    p_ketqua := 2;  -- Thành công
+END sp_them_nhan_vien2;
+/
+
+-- Test Phiếu 3 – bài 2
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_them_nhan_vien2('NV01','CV03','Trung MaNV',TO_DATE('01/01/2000','DD/MM/YYYY'),5000000,20,100000,v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- 0 (MaNV đã có)
+END;
+/
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_them_nhan_vien2('NV20','CVXX','Sai MaCV',TO_DATE('01/01/2000','DD/MM/YYYY'),5000000,20,100000,v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- 1 (MaCV không có)
+END;
+/
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_them_nhan_vien2('NV21','CV03','Nguyen Moi',TO_DATE('01/01/2000','DD/MM/YYYY'),6000000,22,400000,v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- 2 (thành công)
+END;
+/
+
+-- PHIẾU 3 – 3. Thủ tục cập nhật NgaySinh
+
+CREATE OR REPLACE PROCEDURE sp_capnhat_ngaysinh (
+    p_manv     IN  tblNhanVien.MaNV%TYPE,
+    p_ngaysinh IN  tblNhanVien.NgaySinh%TYPE,
+    p_ketqua   OUT NUMBER
+) AS
+    v_dem NUMBER := 0;
+BEGIN
+    SELECT COUNT(*) INTO v_dem FROM tblNhanVien WHERE MaNV = p_manv;
+    IF v_dem = 0 THEN
+        p_ketqua := 0;  -- Không tìm thấy nhân viên
+    ELSE
+        UPDATE tblNhanVien SET NgaySinh = p_ngaysinh WHERE MaNV = p_manv;
+        COMMIT;
+        p_ketqua := 1;  -- Cập nhật thành công
+    END IF;
+END sp_capnhat_ngaysinh;
+/
+
+-- Test Phiếu 3 – bài 3
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_capnhat_ngaysinh('NV01', TO_DATE('01/04/1986','DD/MM/YYYY'), v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- 1 (cập nhật thành công)
+END;
+/
+DECLARE v_kq NUMBER;
+BEGIN
+    sp_capnhat_ngaysinh('NV99', TO_DATE('01/01/1990','DD/MM/YYYY'), v_kq);
+    DBMS_OUTPUT.PUT_LINE('Ket qua: ' || v_kq);  -- 0 (không tìm thấy)
+END;
+/
